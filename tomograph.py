@@ -34,16 +34,18 @@ def radon_transform(img: np.ndarray, n_angles: int, n_detectors: int, \
 
 
 def reverse_radon(sinogram, width, img_size):
-    img = np.zeros(shape=(img_size, img_size), dtype=np.int64)
     n_angles = sinogram.shape[0]
     n_detectors = sinogram.shape[1]
+    img = np.zeros(shape=(n_angles, img_size, img_size), dtype=np.int64)
     width_px = img_size * width
     for i_angle in range(n_angles):
+        if i_angle != 0:
+            img[i_angle] = img[i_angle-1].copy()
         for i_detector in range(n_detectors):
             angle = i_angle/n_angles * np.pi
             delta = width_px * (-0.5 + i_detector/n_detectors)
             for x, y in iter_line(angle, delta, img_size):
-                img[x][y] += sinogram[i_angle, i_detector]
+                img[i_angle][x, y] += sinogram[i_angle, i_detector]
     return img
 
 
