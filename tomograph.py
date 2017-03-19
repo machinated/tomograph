@@ -33,10 +33,18 @@ def radon_transform(img: np.ndarray, n_angles: int, n_detectors: int, \
     return sinogram
 
 
-def reverse_radon(sinogram, width, img_size):
+# class ReverseRadon:
+#     def __init__(self, sinogram, width, img_size):
+#         n_angles = sinogram.shape[0]
+#         n_detectors = sinogram.shape[1]
+#         img = np.zeros(shape=(n_angles, img_size, img_size), dtype=np.int64)
+#
+#     def step():
+#         pass
+
+def reverse_radon(img, sinogram, width, img_size):
     n_angles = sinogram.shape[0]
     n_detectors = sinogram.shape[1]
-    img = np.zeros(shape=(n_angles, img_size, img_size), dtype=np.int64)
     width_px = img_size * width
     for i_angle in range(n_angles):
         if i_angle != 0:
@@ -46,29 +54,33 @@ def reverse_radon(sinogram, width, img_size):
             delta = width_px * (-0.5 + i_detector/n_detectors)
             for x, y in iter_line(angle, delta, img_size):
                 img[i_angle][x, y] += sinogram[i_angle, i_detector]
-    return img
+        yield i_angle
 
 
-def draw_line(img, d, alpha, delta, value):
-    for x, y in iter_line2(alpha, delta, d):
+def draw_line(img, size, alpha, delta, value):
+    for x, y in iter_line(alpha, delta, size):
         img[x, y] = value
 
 
-def draw_rays(size: int, n_rays: int, alpha: float) -> np.ndarray:
-    img = np.zeros((size, size), dtype=float)
-    for i in range(n_rays):
-        delta = -100 + 200 * i/(n_rays-1)
-        val = (i + 1) / n_rays
-        for x, y in iter_line(alpha, delta, min(img.shape)):
-            img[x, y] = val
-    img[size//2, size//2] = 1
+def draw_rays(img_size: int, n_angles: int, n_detectors: int, width: float) -> np.ndarray:
+    img = np.zeros((img_size, img_size), dtype=float)
+
+    width_px = img_size * width
+    for i_angle in range(n_angles):
+        for i_detector in range(n_detectors):
+            angle = i_angle/n_angles * np.pi
+            delta = width_px * (-0.5 + i_detector/n_detectors)
+            value = (i_angle+1)/n_angles
+            draw_line(img, img_size, angle, delta, value)
     return img
 
 
 def test():
-    size = 400
-    n_rays = 20
-    img = draw_rays(size, n_rays, np.pi * 3/8)
+    img_size = 400
+    n_angles = 3
+    n_detectors = 5
+    width = 0.4
+    img = draw_rays(img_size, n_angles, n_detectors, width)
 
     plt.imshow(img)
     # plt.imsave(fname="output.png", arr=img, cmap=plt.cm.gray)
