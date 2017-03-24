@@ -49,7 +49,7 @@ class Window(QtGui.QWidget):
         self.load_image()
 
     def load_image(self):
-        fname = 'img/07.png'
+        fname = 'img/02.png'
         self.img = plt.imread(fname)
         if len(self.img.shape) == 3: # RGB
             self.img = self.img[:,:,0]
@@ -64,14 +64,19 @@ class Window(QtGui.QWidget):
         sinogram = tomograph.radon_transform(self.img, n_angles, n_detectors, width)
 
         img_size = self.parameters.child('img_size').value()
-        result_img = np.zeros(shape=(n_angles, img_size, img_size), dtype=np.int64)
+        result_img = np.zeros(shape=(n_angles, img_size, img_size), dtype=np.float64)
         #            np.empty
         # result_img[0].fill(0)
 
         for step in tomograph.reverse_radon(result_img, sinogram, width, img_size):
             self.progress_bar.setValue(int(100*(step+1)/n_angles))
-        view_array = np.array(result_img, dtype=np.float64)
-        self.result_view.setImage(view_array, autoLevels=False, levels=(0, 10**3))
+        # view_array = np.array(result_img, dtype=np.float64)
+        test_slice = view_array[-1, img_size//2, :]
+        min_value = np.percentile(test_slice, 5.0)
+        max_value = np.percentile(test_slice, 95.0)
+        print("Levels: ({}, {})".format(min_value, max_value))
+        self.result_view.setImage(view_array, autoLevels=False,
+                                  levels=(min_value, max_value))
         play_rate = self.parameters.child('play_rate').value()
         self.result_view.play(play_rate)
         # self.result_view.autoLevels()

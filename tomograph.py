@@ -15,7 +15,7 @@ def iter_line(alpha: float, displacement: float, size: int) -> Iterable[Tuple[in
     dy = int(displacement * cos_a)
     x_iter = map(lambda r: r_circle + int(r * cos_a) + dx, r_iter)
     y_iter = map(lambda r: r_circle + int(r * sin_a) + dy, r_iter)
-    return zip(x_iter, y_iter)
+    return zip(x_iter, y_iter), len(r_iter)
 
 
 def radon_transform(img: np.ndarray, n_angles: int, n_detectors: int, \
@@ -28,7 +28,8 @@ def radon_transform(img: np.ndarray, n_angles: int, n_detectors: int, \
         for i_detector in range(n_detectors):
             angle = i_angle/n_angles * np.pi
             delta = width_px * (-0.5 + i_detector/n_detectors)
-            for x, y in iter_line(angle, delta, img_size):
+            points, _ = iter_line(angle, delta, img_size)
+            for x, y in points:
                 sinogram[i_angle, i_detector] += img[x, y]
     return sinogram
 
@@ -52,8 +53,9 @@ def reverse_radon(img, sinogram, width, img_size):
         for i_detector in range(n_detectors):
             angle = i_angle/n_angles * np.pi
             delta = width_px * (-0.5 + i_detector/n_detectors)
-            for x, y in iter_line(angle, delta, img_size):
-                img[i_angle][x, y] += sinogram[i_angle, i_detector]
+            points, npoints = iter_line(angle, delta, img_size)
+            for x, y in points:
+                img[i_angle][x, y] += sinogram[i_angle, i_detector] / npoints
         yield i_angle
 
 
@@ -77,7 +79,7 @@ def draw_rays(img_size: int, n_angles: int, n_detectors: int, width: float) -> n
 
 def test():
     img_size = 400
-    n_angles = 3
+    n_angles = 20
     n_detectors = 5
     width = 0.4
     img = draw_rays(img_size, n_angles, n_detectors, width)
