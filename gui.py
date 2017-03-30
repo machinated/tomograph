@@ -22,6 +22,7 @@ class Window(QtGui.QWidget):
             {'name': 'n_angles', 'type': 'int', 'value': 50},
             {'name': 'n_detectors', 'type': 'int', 'value': 10},
             {'name': 'width', 'type': 'float', 'value': 0.9},
+            {'name': 'mask_size', 'type': 'float', 'value': 5},
             {'name': 'play_rate', 'type': 'int', 'value': 2}
             )
         self.parameters = pg.parametertree.Parameter.create(
@@ -75,6 +76,12 @@ class Window(QtGui.QWidget):
         n_angles = self.parameters.child('n_angles').value()
         n_detectors = self.parameters.child('n_detectors').value()
         sinogram = tomograph.radon_transform(self.img, n_angles, n_detectors, width)
+
+        mask_size = self.parameters.child('mask_size').value()
+        if mask_size > 0:
+            mask = tomograph.get_mask(mask_size)
+            print("Mask: {}".format(mask))
+            sinogram = tomograph.filter_sinogram(sinogram, mask)
 
         img_size = self.parameters.child('img_size').value()
         result_img = np.zeros(shape=(n_angles, img_size, img_size), dtype=np.float64)

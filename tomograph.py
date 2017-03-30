@@ -59,6 +59,38 @@ def reverse_radon(img, sinogram, width, img_size):
         yield i_angle
 
 
+def get_mask(mask_size):
+    assert isinstance(mask_size, int)
+    assert mask_size > 1
+
+    mask = np.zeros(shape=(mask_size, ), dtype=np.float64)
+
+    mask[0] = 1.0
+    for i in range(1, mask_size):
+        if i % 2 == 0:
+            mask[i] == 0.0
+        else:
+            mask[i] = (-4 / (np.pi ** 2)) / (i ** 2)
+    return mask
+
+
+def filter_sinogram(sinogram, mask):
+    n_angles, n_detectors = sinogram.shape
+    assert n_detectors > 2
+    mask_size = mask.shape[0]
+    filtered = np.empty_like(sinogram)
+    for i_angle in range(n_angles):
+        for i_detector in range(n_detectors):
+            value = sinogram[i_angle, i_detector] * mask[0]
+            for dx in range(1, mask_size):
+                if i_detector + dx < n_detectors:
+                    value += sinogram[i_angle, i_detector + dx] * mask[dx]
+                if i_detector - dx >= 0:
+                    value += sinogram[i_angle, i_detector - dx] * mask[dx]
+            filtered[i_angle, i_detector] = value
+    return filtered
+
+
 def draw_line(img, size, alpha, delta, value):
     for x, y in iter_line(alpha, delta, size):
         img[x, y] = value
