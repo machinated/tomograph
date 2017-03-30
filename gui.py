@@ -15,6 +15,7 @@ class Window(QtGui.QWidget):
         self.result_view = pg.ImageView(self)
         self.progress_bar = QtGui.QProgressBar(self)
         self.button_calculate = QtGui.QPushButton('Calculate', self)
+        self.button_save = QtGui.QPushButton('Save current frame', self)
 
         param_tree = (
             {'name': 'img_size', 'type': 'int', 'value': 400},
@@ -38,6 +39,7 @@ class Window(QtGui.QWidget):
         self.layout.addWidget(self.param_tree)
         self.layout.addWidget(self.progress_bar)
         self.layout.addWidget(self.button_calculate)
+        self.layout.addWidget(self.button_save)
 
         self.layout_images.addWidget(self.image_view)
         self.layout_images.addWidget(self.result_view)
@@ -45,6 +47,7 @@ class Window(QtGui.QWidget):
 
         # signals
         self.button_calculate.clicked.connect(self.calculate)
+        self.button_save.clicked.connect(self.save_current_frame)
 
         self.load_image()
 
@@ -55,6 +58,16 @@ class Window(QtGui.QWidget):
             self.img = self.img[:,:,0]
         assert len(self.img.shape) == 2
         self.image_view.setImage(self.img, autoLevels=False, levels=(0.01, 1))
+
+    def save_current_frame(self):
+        frame = self.result_view.currentIndex
+        fileName = QtGui.QFileDialog.getSaveFileName()
+        if fileName == '':
+            return
+        img = self.result_view.getProcessedImage()
+        self.result_view.imageItem.setImage(img[frame], autoLevels=False)
+        self.result_view.imageItem.save(fileName)
+        self.result_view.updateImage()
 
     def calculate(self):
         self.button_calculate.setEnabled(False)
@@ -71,11 +84,11 @@ class Window(QtGui.QWidget):
         for step in tomograph.reverse_radon(result_img, sinogram, width, img_size):
             self.progress_bar.setValue(int(100*(step+1)/n_angles))
         # view_array = np.array(result_img, dtype=np.float64)
-        test_slice = view_array[-1, img_size//2, :]
+        test_slice = result_img[-1, img_size//2, :]
         min_value = np.percentile(test_slice, 5.0)
         max_value = np.percentile(test_slice, 95.0)
         print("Levels: ({}, {})".format(min_value, max_value))
-        self.result_view.setImage(view_array, autoLevels=False,
+        self.result_view.setImage(result_img, autoLevels=False,
                                   levels=(min_value, max_value))
         play_rate = self.parameters.child('play_rate').value()
         self.result_view.play(play_rate)
