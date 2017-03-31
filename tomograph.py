@@ -18,10 +18,10 @@ def iter_line(alpha: float, displacement: float, size: int) -> Iterable[Tuple[in
     return zip(x_iter, y_iter), len(r_iter)
 
 
-def radon_transform(img: np.ndarray, n_angles: int, n_detectors: int, \
+def radon_transform(img: np.ndarray, sinogram: np.ndarray, n_angles: int, n_detectors: int, \
                      width: float):
     assert len(img.shape) == 2  # greyscale image
-    sinogram = np.zeros(shape=(n_angles, n_detectors), dtype=np.int64)
+    
     img_size = min(img.shape)
     width_px = img_size * width
     for i_angle in range(n_angles):
@@ -31,7 +31,7 @@ def radon_transform(img: np.ndarray, n_angles: int, n_detectors: int, \
             points, _ = iter_line(angle, delta, img_size)
             for x, y in points:
                 sinogram[i_angle, i_detector] += img[x, y]
-    return sinogram
+        yield i_angle
 
 
 # class ReverseRadon:

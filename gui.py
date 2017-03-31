@@ -1,9 +1,14 @@
-import sys
+import datetime
+from collections import OrderedDict
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
-import matplotlib.pyplot as plt
+from dicom.dataset import Dataset, FileDataset
+from pyqtgraph.Qt import QtGui
+
 import tomograph
+
 
 class Window(QtGui.QWidget):
     def __init__(self):
@@ -17,6 +22,7 @@ class Window(QtGui.QWidget):
         self.button_calculate = QtGui.QPushButton('Calculate', self)
         self.button_load = QtGui.QPushButton('Load image', self)
         self.button_save = QtGui.QPushButton('Save current frame', self)
+        self.button_save_dicom = QtGui.QPushButton('Save DICOM', self)
 
         param_tree = (
             {'name': 'img_size', 'type': 'int', 'value': 400},
@@ -24,7 +30,12 @@ class Window(QtGui.QWidget):
             {'name': 'n_detectors', 'type': 'int', 'value': 10},
             {'name': 'width', 'type': 'float', 'value': 0.9},
             {'name': 'mask_size', 'type': 'float', 'value': 5},
-            {'name': 'play_rate', 'type': 'int', 'value': 2}
+            {'name': 'play_rate', 'type': 'int', 'value': 2},
+            {'name': 'Patient data', 'type': 'group', 'children': (
+                {'name': 'PESEL', 'type': 'str', 'value': ''},
+                {'name': 'Name', 'type': 'str', 'value':''},
+                {'name': 'Sex', 'type': 'list', 'values': ('male', 'female')},
+                {'name': 'Comments', 'type': 'text'} )}
             )
         self.parameters = pg.parametertree.Parameter.create(
             name = 'Settings', type='group', children=param_tree)
@@ -43,6 +54,7 @@ class Window(QtGui.QWidget):
         self.layout.addWidget(self.progress_bar)
         self.layout.addWidget(self.button_calculate)
         self.layout.addWidget(self.button_save)
+        self.layout.addWidget(self.button_save_dicom)
 
         self.layout_images.addWidget(self.image_view)
         self.layout_images.addWidget(self.result_view)
@@ -52,14 +64,16 @@ class Window(QtGui.QWidget):
         self.button_calculate.clicked.connect(self.calculate)
         self.button_load.clicked.connect(self.load_image)
         self.button_save.clicked.connect(self.save_current_frame)
+        self.button_save_dicom.clicked.connect(self.save_dicom)
 
         # self.load_image()
 
     def load_image(self):
         # fname = 'img/02.png'
-        fname = QtGui.QFileDialog.getOpenFileName(filter="Images (*.png *.xpm *.jpg)")
+        fname = QtGui.QFileDialog.getOpenFileName(filter="Images (*.png *.xpm *.jpg)")[0]
         if fname == '':
             return
+        print(fname)
         self.img = plt.imread(fname)
         if len(self.img.shape) == 3: # RGB
             self.img = self.img[:,:,0]
@@ -76,12 +90,28 @@ class Window(QtGui.QWidget):
         self.result_view.imageItem.save(fileName)
         self.result_view.updateImage()
 
+    def save_dicom(self):
+        filename = QtGui.QFileDialog.getSaveFileName(filter="DICOM (*.dcm)")[0]
+        if filename == '':
+            return
+        img = self.result_view.getProcessedImage()[-1]
+
+        tree = self.parameters.child('Patient data').getValues()
+        info = OrderedDict()
+        for key in tree:
+            info[key] = tree[key][0]
+        print(info)
+        write_dicom(img, filename, info)
+
     def calculate(self):
         self.button_calculate.setEnabled(False)
         width = self.parameters.child('width').value()
         n_angles = self.parameters.child('n_angles').value()
         n_detectors = self.parameters.child('n_detectors').value()
-        sinogram = tomograph.radon_transform(self.img, n_angles, n_detectors, width)
+
+        sinogram = np.zeros(shape=(n_angles, n_detectors), dtype=np.int64)
+        for step in tomograph.radon_transform(self.img, sinogram, n_angles, n_detectors, width):
+            self.progress_bar.setValue(int(100*(step+1)/n_angles))
 
         mask_size = self.parameters.child('mask_size').value()
         if mask_size > 0:
@@ -107,6 +137,38 @@ class Window(QtGui.QWidget):
         self.result_view.play(play_rate)
         # self.result_view.autoLevels()
         self.button_calculate.setEnabled(True)
+
+
+def write_dicom(pixels, filename, info=None):
+    if (info==None):
+        info = {'pesel': '12345678900', 'name': 'Jan Kowalski', 'sex': 'Mezczyzna', 'comments': 'Tutaj komentarz'}
+    pixels -= np.min(pixels)
+    pixels *= 65536 / np.max(pixels)
+    file_meta = Dataset()
+    file_meta.MediaStorageSOPClassUID = 'Secondary Capture Image Storage'
+    file_meta.MediaStorageSOPInstanceUID = '1.3.6.1.4.1.9590.100.1.1.111165684411017669021768385720736873780'
+    file_meta.ImplementationClassUID = '1.3.6.1.4.1.9590.100.1.0.100.4.0'
+    ds = FileDataset(filename, {}, file_meta=file_meta, preamble=("\0" * 128).encode())
+    ds.Modality = 'WSD'
+
+    ds.PixelRepresentation = 0
+    ds.HighBit = 15
+    ds.BitsStored = 16
+    ds.BitsAllocated = 16
+    ds.Columns = pixels.shape[0]
+    ds.Rows = pixels.shape[1]
+    if pixels.dtype != np.uint16:
+        pixels = pixels.astype(np.uint16)
+    ds.PixelData = pixels.tostring()
+
+    ds.PatientID = info['PESEL']
+    ds.PatientsName = info['Name']
+    ds.PatientsSex = info['Sex']
+    ds.ImageComments = info['Comments']
+    ds.StudyDate = str(datetime.datetime.now()).replace('-', '')
+    time = str(datetime.datetime.now().time()).replace(':', '').split('.')
+    ds.StudyTime = time[0] + '.' + time[1][:3]
+    ds.save_as(filename)
 
 
 def main():
