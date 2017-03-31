@@ -15,6 +15,7 @@ class Window(QtGui.QWidget):
         self.result_view = pg.ImageView(self)
         self.progress_bar = QtGui.QProgressBar(self)
         self.button_calculate = QtGui.QPushButton('Calculate', self)
+        self.button_load = QtGui.QPushButton('Load image', self)
         self.button_save = QtGui.QPushButton('Save current frame', self)
 
         param_tree = (
@@ -37,6 +38,7 @@ class Window(QtGui.QWidget):
         self.layout = QtGui.QVBoxLayout(self)
         self.layout_images = QtGui.QHBoxLayout()
 
+        self.layout.addWidget(self.button_load)
         self.layout.addWidget(self.param_tree)
         self.layout.addWidget(self.progress_bar)
         self.layout.addWidget(self.button_calculate)
@@ -48,12 +50,16 @@ class Window(QtGui.QWidget):
 
         # signals
         self.button_calculate.clicked.connect(self.calculate)
+        self.button_load.clicked.connect(self.load_image)
         self.button_save.clicked.connect(self.save_current_frame)
 
-        self.load_image()
+        # self.load_image()
 
     def load_image(self):
-        fname = 'img/02.png'
+        # fname = 'img/02.png'
+        fname = QtGui.QFileDialog.getOpenFileName(filter="Images (*.png *.xpm *.jpg)")
+        if fname == '':
+            return
         self.img = plt.imread(fname)
         if len(self.img.shape) == 3: # RGB
             self.img = self.img[:,:,0]
